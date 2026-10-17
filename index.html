@@ -48,6 +48,30 @@ h2.sec{font-family:var(--display);font-weight:800;font-size:1.45rem;margin:22px 
 .price.soon{font-size:.82rem;background:var(--yellow);align-self:flex-start;padding:3px 10px;border-radius:999px}
 .more{margin-top:auto;font-weight:800;font-size:.82rem;background:var(--turq);padding:9px;border-radius:999px;text-align:center}
 .badge{position:absolute;top:10px;left:10px;background:var(--pink);font-weight:800;font-size:.72rem;padding:4px 10px;border-radius:999px;z-index:2}
+.media{position:relative;cursor:zoom-in}
+.media.nz{cursor:pointer}
+.card .body{cursor:pointer}
+.more{color:var(--purple);border:0;width:100%}
+.arr{position:absolute;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.92);color:var(--purple);font-size:1.3rem;font-weight:800;line-height:1;padding:0 0 3px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;z-index:3}
+.arr.l{left:8px}.arr.r{right:8px}
+.arr:active{transform:translateY(-50%) scale(.92)}
+.arr.big{width:42px;height:42px;font-size:1.6rem}
+.mdots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:4px;z-index:2;pointer-events:none}
+.mdots i{width:6px;height:6px;border-radius:50%;background:#fff;opacity:.65;box-shadow:0 0 3px rgba(0,0,0,.35)}
+.mdots i.on{opacity:1;width:15px;border-radius:4px}
+.galwrap{position:relative}
+.zm{cursor:zoom-in}
+.th{flex:0 0 56px;width:56px;height:56px;border-radius:14px;overflow:hidden;cursor:zoom-in}
+.th.nz{cursor:default}
+.th .ph{aspect-ratio:auto;width:100%;height:100%;gap:0}
+.th .ph b{font-size:1.6rem}
+#lb{position:fixed;inset:0;z-index:50;background:rgba(48,30,80,.94);display:none;align-items:center;justify-content:center;padding:calc(60px + env(safe-area-inset-top,0px)) 14px calc(64px + env(safe-area-inset-bottom,0px))}
+#lb.on{display:flex}
+#lbimg{max-width:100%;max-height:100%;object-fit:contain;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.4);background:#fff}
+#lb .arr{position:fixed;width:46px;height:46px;font-size:1.7rem}
+#lb .arr.l{left:12px}#lb .arr.r{right:12px}
+.lbx{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;width:42px;height:42px;border-radius:50%;background:#fff;color:var(--purple);font-weight:800;font-size:1rem;box-shadow:var(--shadow)}
+#lbcap{position:absolute;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:16px;right:16px;text-align:center;color:#fff;font-weight:700;font-size:.92rem}
 /* sheets */
 .veil{position:fixed;inset:0;background:rgba(110,80,156,.38);z-index:30;display:none}
 .veil.on{display:block}
@@ -63,6 +87,7 @@ h2.sec{font-family:var(--display);font-weight:800;font-size:1.45rem;margin:22px 
 .info{padding:6px 20px 0}
 .info h3{font-family:var(--display);font-weight:800;font-size:1.55rem;line-height:1.05;margin:8px 0 8px;letter-spacing:-.3px}
 .info .price{font-size:1.3rem;margin-bottom:10px}
+.info .price.soon{display:inline-block;font-size:.95rem;padding:5px 14px}
 .info p{margin:10px 0;line-height:1.45;font-weight:600}
 .info ul{list-style:none;padding:14px 16px;margin:12px 0;background:#fff;border-radius:20px}
 .info li{padding:4px 0 4px 24px;position:relative;font-weight:700;font-size:.92rem}
@@ -136,6 +161,14 @@ footer{text-align:center;font-size:.78rem;font-weight:700;opacity:.6;padding:26p
   </div>
 </div>
 
+<div id="lb" onclick="lbClose()" role="dialog" aria-label="Foto ampliada">
+  <button class="lbx" onclick="lbClose()" aria-label="Cerrar">✕</button>
+  <button class="arr l lb-a" onclick="event.stopPropagation();lbGo(-1)" aria-label="Foto anterior">‹</button>
+  <img id="lbimg" alt="" onclick="event.stopPropagation()">
+  <button class="arr r lb-a" onclick="event.stopPropagation();lbGo(1)" aria-label="Foto siguiente">›</button>
+  <div id="lbcap"></div>
+</div>
+
 <script>
 /* ====== CONFIGURACIÓN (lo único que hay que tocar) ====== */
 const WHATSAPP = "5493516842373";   // número con código de país, sin + ni espacios
@@ -164,7 +197,7 @@ const $=id=>document.getElementById(id);
 const money=n=>"$"+n.toLocaleString("es-AR");
 const lim=p=>({mn:p.minimo||MIN_DEFAULT,st:p.pack||PACK_DEFAULT});
 const kits=n=>n+(n==1?" kit":" kits");
-let sel=1;
+let sel=1,cur={},det=-1,lb={i:0,k:0},lastSwipe=0;
 const numPrice=p=>/^\$?\s*[\d.,]+$/.test(p||"")?parseInt(p.replace(/\D/g,""),10):null;
 
 function csv(t){const r=[];let f="",row=[],q=false;
@@ -187,23 +220,28 @@ function imgUrl(u){const m=u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|u
  if(m)return"https://drive.google.com/thumbnail?id="+m[1]+"&sz=w900";
  return/^(https?:|data:)/.test(u)?u:"img/"+u}
 
-function tile(p,i,idx,withLabel){const bg=BG[idx%BG.length],u=p.imagenes[i];
- return `<div class="ph" style="background:${bg}"><b>${p.emoji}</b>${withLabel?`<small>Foto ${i+1} de 6</small>`:""}${u?`<img src="${imgUrl(u)}" alt="${p.nombre.replace(/"/g,"")}" loading="lazy" onerror="this.remove()">`:""}</div>`}
+function tile(p,i,idx,withLabel,z){const bg=BG[idx%BG.length],u=p.imagenes[i];
+ return `<div class="ph${u&&z?" zm":""}" style="background:${bg}"${u&&z?` onclick="zoom(${idx},${i})"`:""}><b>${p.emoji}</b>${withLabel&&!u?"<small>Foto próximamente</small>":""}${u?`<img src="${imgUrl(u)}" alt="${p.nombre.replace(/"/g,"")}" loading="lazy" onerror="this.remove()">`:""}</div>`}
 
 function priceHTML(p){const n=numPrice(p.precio);
  if(n!==null)return`<div class="price">${money(n)}</div>`;
  if(p.precio)return`<div class="price">${p.precio}</div>`;
  return`<div class="price soon">Precio próximamente</div>`}
 
-function render(){$("grid").innerHTML=P.map((p,i)=>`
- <button class="card ${p.agotado?"off":""}" onclick="openDetail(${i})">
-  <div style="position:relative">${p.agotado?'<span class="badge">Agotado</span>':""}${tile(p,0,i,false)}</div>
-  <div class="body"><div class="n">${p.nombre}</div>${priceHTML(p)}<div class="more">Ver kit</div></div></button>`).join("")}
+function mediaHTML(i){const p=P[i],n=p.imagenes.length,k=cur[i]||0;
+ return(p.agotado?'<span class="badge">Agotado</span>':"")+tile(p,k,i,false)+
+ (n>1?`<button class="arr l" onclick="cardGo(${i},-1,event)" aria-label="Foto anterior">‹</button><button class="arr r" onclick="cardGo(${i},1,event)" aria-label="Foto siguiente">›</button><div class="mdots">${p.imagenes.map((_,j)=>`<i class="${j==k?"on":""}"></i>`).join("")}</div>`:"")}
+function cardGo(i,d,e){e.stopPropagation();const n=P[i].imagenes.length;cur[i]=((cur[i]||0)+d+n)%n;$("m"+i).innerHTML=mediaHTML(i)}
+function zoomCard(i){zoom(i,cur[i]||0,true)}
+function render(){cur={};$("grid").innerHTML=P.map((p,i)=>`
+ <div class="card ${p.agotado?"off":""}">
+  <div class="media${p.imagenes.length?"":" nz"}" id="m${i}" data-i="${i}" onclick="zoomCard(${i})">${mediaHTML(i)}</div>
+  <div class="body" onclick="openDetail(${i})"><div class="n">${p.nombre}</div>${priceHTML(p)}<button class="more">Ver kit</button></div></div>`).join("")}
 
-function openDetail(i){const p=P[i];sel=lim(p).mn;
+function openDetail(i){const p=P[i];sel=lim(p).mn;det=i;const n=Math.max(1,p.imagenes.length),ks=[...Array(n).keys()];
  $("detail").innerHTML=`<button class="x" onclick="closeAll()" aria-label="Cerrar">✕</button>
- <div class="left"><div class="gal" onscroll="dots(this)">${[0,1,2,3,4,5].map(k=>tile(p,k,i,true)).join("")}</div>
- <div class="dots">${[0,1,2,3,4,5].map(k=>`<span class="${k?"":"on"}"></span>`).join("")}</div></div>
+ <div class="left"><div class="galwrap"><div class="gal" onscroll="dots(this)">${ks.map(k=>tile(p,k,i,true,true)).join("")}</div>${n>1?`<button class="arr l big" onclick="galGo(-1)" aria-label="Foto anterior">‹</button><button class="arr r big" onclick="galGo(1)" aria-label="Foto siguiente">›</button>`:""}</div>
+ ${n>1?`<div class="dots">${ks.map(k=>`<span class="${k?"":"on"}"></span>`).join("")}</div>`:""}</div>
  <div class="info"><h3>${p.nombre}</h3>${priceHTML(p)}<p>${p.descripcion}</p>
  ${p.incluye.length?`<ul>${p.incluye.map(x=>`<li>${x}</li>`).join("")}</ul>`:""}
  ${p.agotado?"":`<div class="pick"><small>${hint(p)}</small><div class="q"><button onclick="pick(${i},-1)" aria-label="Menos">−</button><span id="pq">${sel}</span><button onclick="pick(${i},1)" aria-label="Más">+</button></div></div>`}
@@ -211,7 +249,8 @@ function openDetail(i){const p=P[i];sel=lim(p).mn;
  show("detail")}
 function hint(p){const{mn,st}=lim(p);const a=[];if(mn>1)a.push("Pedido mínimo: "+kits(mn));if(st>1)a.push("Se suman de a "+st);return a.length?a.join(" · "):"¿Cuántos kits querés?"}
 function pick(i,d){const{mn,st}=lim(P[i]);sel=Math.max(mn,sel+d*st);$("pq").textContent=sel;$("addbtn").textContent="Agregar "+kits(sel)+" al pedido"}
-function dots(g){const k=Math.round(g.scrollLeft/g.clientWidth);g.parentNode.querySelectorAll(".dots span").forEach((s,j)=>s.classList.toggle("on",j==k))}
+function galGo(d){const g=document.querySelector("#detail .gal"),n=g.children.length,k=(Math.round(g.scrollLeft/g.clientWidth)+d+n)%n;g.scrollTo({left:k*g.clientWidth,behavior:"smooth"})}
+function dots(g){const k=Math.round(g.scrollLeft/g.clientWidth);g.closest(".left").querySelectorAll(".dots span").forEach((s,j)=>s.classList.toggle("on",j==k))}
 function show(id){$("veil").classList.add("on");$(id).classList.add("on")}
 function closeAll(){$("veil").classList.remove("on");["detail","cart"].forEach(x=>$(x).classList.remove("on"))}
 function openCart(){draw();show("cart")}
@@ -223,7 +262,7 @@ function draw(){const ids=Object.keys(cart),count=ids.reduce((s,i)=>s+cart[i],0)
  const c=$("cart-count");c.style.display=count?"flex":"none";c.textContent=count;
  $("bar").classList.toggle("on",count>0);
  $("bar-t").textContent=kits(count)+(total?" · "+money(total):"");
- $("items").innerHTML=count?ids.map(i=>{const n=numPrice(P[i].precio);return`<div class="row"><div class="t">${P[i].nombre}<small>${n!==null?money(n)+" c/u":"Precio a confirmar"}</small></div>
+ $("items").innerHTML=count?ids.map(i=>{const n=numPrice(P[i].precio);return`<div class="row"><div class="th${P[i].imagenes.length?"":" nz"}" onclick="zoom(${i},0)">${tile(P[i],0,i,false)}</div><div class="t">${P[i].nombre}<small>${n!==null?money(n)+" c/u":"Precio a confirmar"}</small></div>
   <div class="q"><button onclick="qty(${i},-1)" aria-label="Menos">−</button>${cart[i]}<button onclick="qty(${i},1)" aria-label="Más">+</button></div></div>`}).join(""):'<div class="empty">Todavía no agregaste nada ✦<br>Elegí tu kit favorito.</div>';
  $("tot").textContent=total?money(total):"A confirmar";
  $("note").textContent=pend&&total?"Hay "+pend+(pend>1?" kits":" kit")+" con precio a confirmar.":pend?"Te confirmamos el precio por WhatsApp.":"";
@@ -234,6 +273,28 @@ function sendWA(){let m="¡Hola! Quiero hacer este pedido en Tiny Party:\n\n",to
   m+="• "+p.nombre+" x"+cart[i]+(n!==null?" — "+money(n*cart[i]):" — precio a confirmar")+"\n"});
  if(total)m+="\nTotal (sin los kits a confirmar): "+money(total);
  window.open("https://wa.me/"+WHATSAPP+"?text="+encodeURIComponent(m),"_blank")}
+
+function zoom(i,k,fromCard){if(Date.now()-lastSwipe<350)return;
+ if(!P[i].imagenes.length){if(fromCard)openDetail(i);return}
+ lb={i,k};lbShow();$("lb").classList.add("on")}
+function lbShow(){const p=P[lb.i],n=p.imagenes.length;
+ $("lbimg").src=imgUrl(p.imagenes[lb.k]);$("lbimg").alt=p.nombre;
+ $("lbcap").textContent=p.nombre+(n>1?" · "+(lb.k+1)+" / "+n:"");
+ document.querySelectorAll(".lb-a").forEach(b=>b.style.display=n>1?"flex":"none");
+ if(n>1)new Image().src=imgUrl(p.imagenes[(lb.k+1)%n])}
+function lbGo(d){const n=P[lb.i].imagenes.length;lb.k=(lb.k+d+n)%n;lbShow()}
+function lbClose(){$("lb").classList.remove("on");$("lbimg").removeAttribute("src");
+ if($("m"+lb.i)){cur[lb.i]=lb.k;$("m"+lb.i).innerHTML=mediaHTML(lb.i)}
+ const g=document.querySelector("#detail .gal");if(g&&det===lb.i&&$("detail").classList.contains("on"))g.scrollTo({left:lb.k*g.clientWidth})}
+document.addEventListener("keydown",e=>{const o=$("lb").classList.contains("on");
+ if(e.key=="Escape")o?lbClose():closeAll();
+ else if(o&&e.key=="ArrowRight")lbGo(1);else if(o&&e.key=="ArrowLeft")lbGo(-1)});
+function swipe(el,fn){let x=null,y=0;
+ el.addEventListener("touchstart",e=>{x=e.touches[0].clientX;y=e.touches[0].clientY},{passive:true});
+ el.addEventListener("touchend",e=>{if(x===null)return;const d=e.changedTouches[0].clientX-x,v=e.changedTouches[0].clientY-y;x=null;
+  if(Math.abs(d)>45&&Math.abs(v)<Math.abs(d)){lastSwipe=Date.now();fn(d<0?1:-1,e)}},{passive:true})}
+swipe($("lb"),d=>lbGo(d));
+swipe($("grid"),(d,e)=>{const m=e.target.closest&&e.target.closest(".media");if(m&&P[m.dataset.i].imagenes.length>1)cardGo(+m.dataset.i,d,{stopPropagation(){}})});
 
 function sheetUrl(u){u=u.trim();const g=(u.match(/[?&#]gid=(\d+)/)||[])[1],q=g?"&gid="+g:"";
  let m=u.match(/spreadsheets\/d\/e\/([\w-]+)/);
